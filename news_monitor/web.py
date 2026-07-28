@@ -131,7 +131,7 @@ def create_app(monitor):
             total = cursor.fetchone()[0]
 
             cursor.execute(f'''
-                SELECT site_name, title, translated_title, url, date, created_at, pushed, llm_relevance, llm_reason
+                SELECT id, site_name, title, translated_title, url, date, created_at, pushed, llm_relevance, llm_reason, duplicate_of
                 FROM news{where_clause}
                 ORDER BY created_at DESC
                 LIMIT ? OFFSET ?
@@ -144,8 +144,9 @@ def create_app(monitor):
 
             news_list = []
             for item in news:
-                relevance = item[7]
-                pushed = item[6]
+                relevance = item[8] if len(item) > 8 else -1
+                pushed = item[7] if len(item) > 7 else 0
+                dup_of = item[10] if len(item) > 10 else None
                 if pushed == 2:
                     push_status = 'filtered'
                 elif pushed == 1:
@@ -155,11 +156,13 @@ def create_app(monitor):
                 else:
                     push_status = 'pending'
                 news_list.append({
-                    'site_name': item[0], 'title': item[1],
-                    'translated_title': item[2], 'url': item[3],
-                    'date': item[4], 'created_at': item[5],
+                    'id': item[0],
+                    'site_name': item[1], 'title': item[2],
+                    'translated_title': item[3] if len(item) > 3 else '', 'url': item[4] if len(item) > 4 else '',
+                    'date': item[5] if len(item) > 5 else '', 'created_at': item[6] if len(item) > 6 else '',
                     'pushed': pushed, 'push_status': push_status,
-                    'llm_relevance': relevance, 'llm_reason': item[8] or ''
+                    'llm_relevance': relevance, 'llm_reason': item[9] if len(item) > 9 else '',
+                    'duplicate_of': dup_of
                 })
 
             return jsonify({

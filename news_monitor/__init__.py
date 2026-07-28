@@ -224,6 +224,27 @@ class NewsMonitor:
             new_count, new_news_list = self.save_news(all_news)
             self.news_version += 1
 
+            # Deduplicate by title similarity
+            if new_count > 0:
+                import sqlite3
+                from . import dedup
+                conn = sqlite3.connect(str(db.get_db_path()))
+                cursor = conn.cursor()
+                cursor.execute(
+                    'SELECT id, title, site_name FROM news WHERE created_at >= datetime("now", "-7 days")')
+                existing = cursor.fetchall()
+                dups = dedup.find_similar(new_news_list, existing)
+                if dups:
+                    cursor.execute('SELECT id, site_name, title, url FROM news ORDER BY id DESC LIMIT ?',
+                                   (new_count * 2,))
+                    recent = cursor.fetchall()
+                    inserted = [(r[1], r[2], r[3], r[0]) for r in recent
+                                if any(n['title'] == r[2] for n in new_news_list)]
+                    dedup.mark_duplicates(cursor, dups, new_news_list, inserted)
+                    conn.commit()
+                    logger.info(f"去重完成: {len(dups)} 条标记为重复")
+                conn.close()
+
             if new_count > 0:
                 logger.info(f"发现 {new_count} 条新新闻")
                 filtered_news = [n for n in new_news_list if self.match_keyword_rules(n)]
