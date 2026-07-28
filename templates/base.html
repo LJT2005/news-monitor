@@ -313,8 +313,13 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'stats_page' %}active{% endif %}" href="{{ url_for('stats_page') }}">
+                                <i class="bi bi-bar-chart-fill"></i> 统计
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'sites_page' %}active{% endif %}" href="{{ url_for('sites_page') }}">
-                                <i class="bi bi-activity"></i> 站点健康
+                                <i class="bi bi-activity"></i> 站点
                             </a>
                         </li>
                     </ul>

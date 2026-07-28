@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block title %}统计面板 - 新闻监控系统{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-4 mb-4">
+        <div>
+            <h1 class="h2 mb-1">
+                <i class="bi bi-bar-chart-fill text-primary me-2"></i>统计面板
+            </h1>
+            <p class="text-muted mb-0">新闻采集概览与站点健康状态</p>
+        </div>
+    </div>
+</div>
+
+<!-- 概要卡片 -->
+<div class="row mb-4 fade-in" style="animation-delay: 0.1s" id="summary-cards">
+    <div class="col-md-3 col-6 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center py-3">
+                <div class="h2 text-primary mb-0 fw-bold" id="stat-total-news">-</div>
+                <small class="text-muted">新闻总数</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center py-3">
+                <div class="h2 text-success mb-0 fw-bold" id="stat-success-rate">-</div>
+                <small class="text-muted">抓取成功率</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center py-3">
+                <div class="h2 text-warning mb-0 fw-bold" id="stat-enabled-sites">-</div>
+                <small class="text-muted">启用站点</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center py-3">
+                <div class="h2 mb-0 fw-bold" id="stat-failing" style="color:#dc2626">-</div>
+                <small class="text-muted">故障站点</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 图表行 -->
+<div class="row mb-4 fade-in" style="animation-delay: 0.2s">
+    <!-- 7日趋势 -->
+    <div class="col-md-8 mb-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom-0 pb-0">
+                <h6 class="mb-0"><i class="bi bi-graph-up text-primary me-1"></i>近7天新闻趋势</h6>
+            </div>
+            <div class="card-body">
+                <canvas id="dailyChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    <!-- 成功率饼图 -->
+    <div class="col-md-4 mb-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom-0 pb-0">
+                <h6 class="mb-0"><i class="bi bi-pie-chart text-success me-1"></i>抓取成功率</h6>
+            </div>
+            <div class="card-body">
+                <canvas id="successChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 来源排行 -->
+<div class="row mb-4 fade-in" style="animation-delay: 0.3s">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom-0 pb-0">
+                <h6 class="mb-0"><i class="bi bi-bar-chart-steps text-info me-1"></i>来源新闻量 Top 20</h6>
+            </div>
+            <div class="card-body">
+                <canvas id="sourceChart" height="250"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 站点健康表 -->
+<div class="row fade-in" style="animation-delay: 0.4s">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom-0 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-activity text-warning me-1"></i>站点健康详情</h6>
+                <input type="text" class="form-control form-control-sm w-auto" id="site-search" placeholder="搜索站点..." oninput="filterSiteTable()">
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table class="table table-hover mb-0" id="site-table">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>站点</th>
+                                <th class="text-end">新闻数</th>
+                                <th class="text-end">成功率</th>
+                                <th class="text-end">检查次数</th>
+                                <th class="text-end">响应时间(s)</th>
+                                <th>最近检查</th>
+                            </tr>
+                        </thead>
+                        <tbody id="site-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+let charts = {};
+
+async function loadStats() {
+    try {
+        const resp = await fetch('/api/stats');
+        const data = await resp.json();
+
+        // Summary cards
+        document.getElementById('stat-total-news').textContent = data.total_news.toLocaleString();
+        document.getElementById('stat-success-rate').textContent = data.success_rate + '%';
+        document.getElementById('stat-enabled-sites').textContent = data.enabled_sites;
+        document.getElementById('stat-failing').textContent = data.failing_sites;
+
+        // Destroy old charts
+        Object.values(charts).forEach(c => c.destroy());
+        charts = {};
+
+        // Daily trend
+        const dailyCtx = document.getElementById('dailyChart').getContext('2d');
+        charts.daily = new Chart(dailyCtx, {
+            type: 'bar',
+            data: {
+                labels: data.daily_news.dates,
+                datasets: [{
+                    label: '新闻数',
+                    data: data.daily_news.counts,
+                    backgroundColor: 'rgba(37,99,235,0.7)',
+                    borderRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { precision: 0 } }
+                }
+            }
+        });
+
+        // Success pie
+        const pieCtx = document.getElementById('successChart').getContext('2d');
+        charts.pie = new Chart(pieCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['成功', '失败'],
+                datasets: [{
+                    data: [data.total_success, data.total_errors],
+                    backgroundColor: ['#059669', '#dc2626'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+
+        // Source bar chart (top 20)
+        const srcCtx = document.getElementById('sourceChart').getContext('2d');
+        const srcData = data.news_by_source;
+        charts.src = new Chart(srcCtx, {
+            type: 'bar',
+            data: {
+                labels: srcData.map(s => s.name.length > 18 ? s.name.slice(0,16)+'…' : s.name),
+                datasets: [{
+                    label: '新闻数',
+                    data: srcData.map(s => s.count),
+                    backgroundColor: 'rgba(8,145,178,0.7)',
+                    borderRadius: 4,
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { beginAtZero: true, ticks: { precision: 0 } }
+                }
+            }
+        });
+
+        // Site health table
+        const tbody = document.getElementById('site-table-body');
+        let html = '';
+        data.site_summary.forEach(s => {
+            const rateClass = s.status === 'ok' ? 'text-success' : 'text-danger';
+            const icon = s.status === 'ok' ? '✅' : '❌';
+            html += `<tr class="site-row" data-name="${s.name.toLowerCase()}">
+                <td>${icon} ${escapeHtml(s.name)}</td>
+                <td class="text-end fw-semibold">${s.total_news.toLocaleString()}</td>
+                <td class="text-end ${rateClass}">${s.success_rate}%</td>
+                <td class="text-end text-muted">${s.total_checks.toLocaleString()}</td>
+                <td class="text-end text-muted">${s.avg_response_time}</td>
+                <td class="text-muted small">${s.last_check || '-'}</td>
+            </tr>`;
+        });
+        tbody.innerHTML = html;
+
+    } catch (e) {
+        console.error('加载统计数据失败:', e);
+    }
+}
+
+function filterSiteTable() {
+    const q = document.getElementById('site-search').value.toLowerCase();
+    document.querySelectorAll('.site-row').forEach(row => {
+        row.style.display = row.dataset.name.includes(q) ? '' : 'none';
+    });
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Load on page ready
+document.addEventListener('DOMContentLoaded', loadStats);
+// Auto-refresh every 60s
+setInterval(loadStats, 60000);
+</script>
+{% endblock %}

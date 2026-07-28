@@ -56,6 +56,10 @@ def create_app(monitor):
     def sites_page():
         return render_template('sites.html')
 
+    @app.route('/stats')
+    def stats_page():
+        return render_template('stats.html')
+
     # ── Config API ──────────────────────────────────────────────
 
     @app.route('/api/config', methods=['GET', 'POST'])
@@ -266,6 +270,88 @@ def create_app(monitor):
             'enabled_sites': enabled_count,
             'failed_sites_24h': failed_24h,
             'is_running': monitor.is_running,
+        })
+
+    @app.route('/api/stats')
+    def api_dashboard_stats():
+        """Aggregated statistics for the dashboard."""
+        import sqlite3
+        conn = sqlite3.connect(str(get_db_path()))
+        cursor = conn.cursor()
+
+        # Total news count
+        cursor.execute('SELECT COUNT(*) FROM news')
+        total_news = cursor.fetchone()[0]
+
+        # News by source (top 20)
+        cursor.execute('''
+            SELECT site_name, COUNT(*) as cnt
+            FROM news GROUP BY site_name
+            ORDER BY cnt DESC LIMIT 20
+        ''')
+        news_by_source = [{'name': r[0], 'count': r[1]} for r in cursor.fetchall()]
+
+        # News over last 7 days
+        from datetime import datetime as dt
+        dates = []
+        counts = []
+        for i in range(6, -1, -1):
+            day = dt.now() - __import__('datetime').timedelta(days=i)
+            day_str = day.strftime('%Y-%m-%d')
+            dates.append(day_str)
+            cursor.execute(
+                "SELECT COUNT(*) FROM news WHERE date(date) = ?", (day_str,))
+            counts.append(cursor.fetchone()[0])
+
+        # Site stats
+        cursor.execute('SELECT * FROM site_stats ORDER BY last_check DESC')
+        cols = [d[0] for d in cursor.description]
+        site_stats_raw = [dict(zip(cols, r)) for r in cursor.fetchall()]
+
+        # Compute success rate and summarize
+        total_checks = sum(s.get('total_checks', 0) for s in site_stats_raw)
+        total_success = sum(s.get('total_success', 0) for s in site_stats_raw)
+        total_errors = sum(s.get('total_errors', 0) for s in site_stats_raw)
+        success_rate = round(total_success / total_checks * 100, 1) if total_checks > 0 else 0
+
+        # Sites with consecutive errors > 0
+        failing = [s for s in site_stats_raw if s.get('consecutive_errors', 0) > 0]
+
+        site_summary = []
+        for s in site_stats_raw:
+            sc = s.get('total_checks', 0)
+            ss = s.get('total_success', 0)
+            rate = round(ss / sc * 100, 1) if sc > 0 else 0
+            site_summary.append({
+                'name': s['site_name'],
+                'success_rate': rate,
+                'total_checks': sc,
+                'total_news': s.get('total_news', 0),
+                'last_check': s.get('last_check', ''),
+                'avg_response_time': round(s.get('avg_response_time', 0), 2),
+                'consecutive_errors': s.get('consecutive_errors', 0),
+                'status': 'error' if s.get('consecutive_errors', 0) > 0 else 'ok'
+            })
+        site_summary.sort(key=lambda x: x['total_news'], reverse=True)
+
+        # Enabled sites count
+        enabled_count = len([s for s in monitor.config.get('news_sites', [])
+                             if s.get('enabled', True)])
+
+        conn.close()
+
+        return jsonify({
+            'total_news': total_news,
+            'total_checks': total_checks,
+            'total_success': total_success,
+            'total_errors': total_errors,
+            'success_rate': success_rate,
+            'enabled_sites': enabled_count,
+            'failing_sites': len(failing),
+            'news_by_source': news_by_source,
+            'daily_news': {'dates': dates, 'counts': counts},
+            'site_summary': site_summary,
+            'pending_news': monitor.get_pending_count(),
         })
 
     @app.route('/api/status')
