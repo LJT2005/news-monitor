@@ -68,6 +68,15 @@ def create_app(monitor):
             return jsonify(monitor.config)
         try:
             new_config = request.json
+            # Validate before saving
+            from . import validator
+            valid, errors = validator.validate_config(new_config)
+            if not valid:
+                return jsonify({
+                    'success': False,
+                    'message': '配置校验失败',
+                    'errors': errors
+                })
             monitor.config = new_config
             monitor.save_config()
             return jsonify({'success': True, 'message': '配置保存成功'})

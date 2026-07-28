@@ -1448,7 +1448,11 @@
                         btn.classList.remove('saving');
                     }, 2000);
                 } else {
-                    showAlert('❌ 保存失败: ' + data.message, 'danger');
+                    let msg = '❌ ' + data.message;
+                    if (data.errors && data.errors.length > 0) {
+                        msg += '<br><small>' + data.errors.join('<br>') + '</small>';
+                    }
+                    showAlert(msg, 'danger');
                     btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> 保存配置';
                     btn.classList.remove('saving');
                 }
