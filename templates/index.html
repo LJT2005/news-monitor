@@ -204,6 +204,11 @@
                 </select>
             </div>
             <div class="col-auto">
+                <button class="btn btn-sm btn-outline-warning" id="filter-starred" onclick="toggleStarFilter()" title="只看星标">
+                    <i class="bi bi-star"></i> 星标
+                </button>
+            </div>
+            <div class="col-auto">
                 <button class="btn btn-sm btn-outline-secondary" onclick="resetFilter()">
                     <i class="bi bi-x-circle"></i> 重置
                 </button>
@@ -253,6 +258,7 @@
     let currentPerPage = 20;
     let filterSite = '';
     let filterPushed = '';
+    let filterStarred = '';
     let siteNamesLoaded = false;
     let newsVersion = 0;  // 跟踪数据版本，有新数据时刷新
 
@@ -321,6 +327,7 @@
         let url = `/api/news?page=${currentPage}&per_page=${currentPerPage}`;
         if (filterSite) url += `&site=${encodeURIComponent(filterSite)}`;
         if (filterPushed !== '') url += `&pushed=${filterPushed}`;
+        if (filterStarred) url += `&starred=1`;
         const q = document.getElementById('search-input')?.value?.trim();
         if (q) url += `&q=${encodeURIComponent(q)}`;
 
@@ -382,7 +389,24 @@
         document.getElementById('filter-pushed').value = '';
         filterSite = '';
         filterPushed = '';
+        filterStarred = '';
+        const sbtn = document.getElementById('filter-starred');
+        if (sbtn) { sbtn.classList.remove('btn-warning'); sbtn.classList.add('btn-outline-warning'); sbtn.innerHTML = '<i class="bi bi-star"></i> 星标'; }
         currentPage = 1;
+        loadPage(1);
+    }
+
+    function toggleStarFilter() {
+        const btn = document.getElementById('filter-starred');
+        if (filterStarred) {
+            filterStarred = '';
+            btn.classList.remove('btn-warning'); btn.classList.add('btn-outline-warning');
+            btn.innerHTML = '<i class="bi bi-star"></i> 星标';
+        } else {
+            filterStarred = '1';
+            btn.classList.remove('btn-outline-warning'); btn.classList.add('btn-warning');
+            btn.innerHTML = '<i class="bi bi-star-fill"></i> 星标';
+        }
         loadPage(1);
     }
 
@@ -405,6 +429,21 @@
         document.getElementById('clear-search-btn').style.display = 'none';
         document.getElementById('search-result-count').innerHTML = '';
         loadPage(1);
+    }
+
+    async function toggleStar(id, el) {
+        try {
+            const resp = await fetch(`/api/news/${id}/star`, { method: 'POST' });
+            const data = await resp.json();
+            if (data.success) {
+                el.className = data.starred 
+                    ? 'bi bi-star-fill text-warning ms-2' 
+                    : 'bi bi-star text-muted ms-2';
+                el.title = data.starred ? '取消星标' : '添加星标';
+            }
+        } catch (e) {
+            console.error('Star toggle failed:', e);
+        }
     }
 
     function exportCSV(range) {
@@ -501,6 +540,10 @@
                                 <small class="text-muted text-nowrap ms-2">
                                     <i class="bi bi-clock"></i> ${date}
                                 </small>
+                                <i class="bi ${item.starred ? 'bi-star-fill text-warning' : 'bi-star text-muted'} ms-2" 
+                                   style="cursor:pointer; font-size:1.1rem" 
+                                   onclick="toggleStar(${item.id}, this)" 
+                                   title="${item.starred ? '取消星标' : '添加星标'}"></i>
                             </div>
                             ${hasTranslation ? `
                                 <h6 class="news-title mb-1">

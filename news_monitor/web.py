@@ -10,7 +10,10 @@ import sqlite3
 import threading
 import logging
 from datetime import datetime, timedelta
+from urllib.parse import urljoin
 
+import requests
+from bs4 import BeautifulSoup
 from flask import Flask, render_template, request, jsonify
 
 from paths import get_config_path, get_db_path, get_log_path, get_template_dir
@@ -101,6 +104,7 @@ def create_app(monitor):
             site_filter = request.args.get('site', '')
             pushed_filter = request.args.get('pushed', '')
             search_query = request.args.get('q', '').strip()
+            starred_filter = request.args.get('starred', '')
             offset = (page - 1) * per_page
 
             conn = sqlite3.connect(str(get_db_path()))
@@ -125,13 +129,15 @@ def create_app(monitor):
             elif pushed_filter == 'filtered':
                 conditions.append(
                     f'(pushed = 2 OR (pushed = 0 AND llm_relevance >= 0 AND llm_relevance < {llm_threshold}))')
+            if starred_filter == '1':
+                conditions.append('starred = 1')
             where_clause = (' WHERE ' + ' AND '.join(conditions)) if conditions else ''
 
             cursor.execute(f'SELECT COUNT(*) FROM news{where_clause}', params)
             total = cursor.fetchone()[0]
 
             cursor.execute(f'''
-                SELECT id, site_name, title, translated_title, url, date, created_at, pushed, llm_relevance, llm_reason, duplicate_of
+                SELECT id, site_name, title, translated_title, url, date, created_at, pushed, llm_relevance, llm_reason, duplicate_of, starred
                 FROM news{where_clause}
                 ORDER BY created_at DESC
                 LIMIT ? OFFSET ?
@@ -162,7 +168,8 @@ def create_app(monitor):
                     'date': item[5] if len(item) > 5 else '', 'created_at': item[6] if len(item) > 6 else '',
                     'pushed': pushed, 'push_status': push_status,
                     'llm_relevance': relevance, 'llm_reason': item[9] if len(item) > 9 else '',
-                    'duplicate_of': dup_of
+                    'duplicate_of': dup_of,
+                    'starred': item[11] if len(item) > 11 else 0
                 })
 
             return jsonify({
@@ -172,6 +179,52 @@ def create_app(monitor):
             })
         except Exception as e:
             return jsonify({'error': str(e)})
+
+    @app.route('/api/news/<int:news_id>/star', methods=['POST'])
+    def api_star_news(news_id):
+        """Toggle star on a news item."""
+        try:
+            conn = sqlite3.connect(str(get_db_path()))
+            cursor = conn.cursor()
+            cursor.execute('SELECT starred FROM news WHERE id = ?', (news_id,))
+            row = cursor.fetchone()
+            if not row:
+                conn.close()
+                return jsonify({'success': False, 'message': '新闻不存在'})
+            new_val = 0 if row[0] else 1
+            cursor.execute('UPDATE news SET starred = ? WHERE id = ?', (new_val, news_id))
+            conn.commit()
+            conn.close()
+            return jsonify({'success': True, 'starred': bool(new_val)})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)})
+
+    @app.route('/api/discover_rss', methods=['POST'])
+    def api_discover_rss():
+        """Auto-detect RSS feeds from a website URL."""
+        try:
+            body = request.json or {}
+            target_url = body.get('url', '').strip()
+            if not target_url:
+                return jsonify({'success': False, 'message': '未提供URL'})
+
+            resp = requests.get(target_url, timeout=15, headers={
+                'User-Agent': 'Mozilla/5.0 (compatible; NewsMonitor/1.0)'
+            })
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, 'html.parser')
+
+            feeds = []
+            for link in soup.find_all('link', rel='alternate'):
+                if link.get('type') in ('application/rss+xml', 'application/atom+xml'):
+                    feeds.append({
+                        'title': link.get('title', ''),
+                        'url': urljoin(target_url, link.get('href', ''))
+                    })
+
+            return jsonify({'success': True, 'feeds': feeds})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e), 'feeds': []})
 
     # ── Action APIs ─────────────────────────────────────────────
 

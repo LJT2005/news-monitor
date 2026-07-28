@@ -36,6 +36,7 @@ def init_database():
         ('llm_relevance', 'ALTER TABLE news ADD COLUMN llm_relevance INTEGER DEFAULT -1'),
         ('llm_reason', "ALTER TABLE news ADD COLUMN llm_reason TEXT DEFAULT ''"),
         ('duplicate_of', 'ALTER TABLE news ADD COLUMN duplicate_of INTEGER DEFAULT NULL'),
+        ('starred', 'ALTER TABLE news ADD COLUMN starred INTEGER DEFAULT 0'),
     ]:
         try:
             cursor.execute(ddl)
