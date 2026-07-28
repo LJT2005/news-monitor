@@ -354,6 +354,66 @@ def create_app(monitor):
             'pending_news': monitor.get_pending_count(),
         })
 
+    @app.route('/api/export/csv')
+    def api_export_csv():
+        """Export news as CSV file."""
+        import csv
+        import io
+        from flask import Response
+
+        site_filter = request.args.get('site', '')
+        date_from = request.args.get('from', '')
+        date_to = request.args.get('to', '')
+        pushed_filter = request.args.get('pushed', '')
+
+        conn = sqlite3.connect(str(get_db_path()))
+        cursor = conn.cursor()
+
+        conditions = []
+        params = []
+        if site_filter:
+            conditions.append('site_name = ?')
+            params.append(site_filter)
+        if date_from:
+            conditions.append('date >= ?')
+            params.append(date_from)
+        if date_to:
+            conditions.append('date <= ?')
+            params.append(date_to)
+        if pushed_filter == '1':
+            conditions.append('pushed = 1')
+        elif pushed_filter == '2':
+            conditions.append('pushed = 2')
+        elif pushed_filter == '0':
+            conditions.append('pushed = 0')
+
+        where = (' WHERE ' + ' AND '.join(conditions)) if conditions else ''
+        cursor.execute(f'''
+            SELECT site_name, title, translated_title, url, date, created_at, pushed, llm_relevance, llm_reason
+            FROM news{where} ORDER BY created_at DESC
+        ''', params)
+        rows = cursor.fetchall()
+        conn.close()
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['来源', '英文标题', '中文标题', 'URL', '日期', '入库时间', '推送状态', 'LLM分数', 'LLM理由'])
+        push_labels = {0: '未推送', 1: '已推送', 2: '主题无关'}
+        for r in rows:
+            writer.writerow([
+                r[0], r[1], r[2] or '', r[3], r[4], r[5],
+                push_labels.get(r[6], str(r[6])),
+                r[7] if r[7] >= 0 else '', (r[8] or '')
+            ])
+
+        output.seek(0)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        return Response(
+            output.getvalue().encode('utf-8-sig'),
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment; filename=news_export_{timestamp}.csv'}
+        )
+
     @app.route('/api/status')
     def api_status():
         next_check_time = None
