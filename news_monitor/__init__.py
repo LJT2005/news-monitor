@@ -153,9 +153,6 @@ class NewsMonitor:
 
     # ── Scheduler ───────────────────────────────────────────────
 
-    def clean_log_file(self):
-        sched_mod.clean_log_file()
-
     def check_news_updates(self):
         """Main news update check — scrape, score, filter, push."""
         if self.is_running:
@@ -165,7 +162,6 @@ class NewsMonitor:
         self.is_running = True
         self.last_check_time = datetime.now()
         try:
-            self.clean_log_file()
             logger.info("开始检查新闻更新...")
             all_news = []
 
