@@ -30,6 +30,20 @@
     </div>
 </div>
 
+<!-- 搜索栏 -->
+<div class="row mb-3 fade-in">
+    <div class="col-md-6">
+        <div class="input-group">
+            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control" id="search-input" placeholder="搜索标题（英文/中文）..." oninput="onSearch()">
+            <button class="btn btn-outline-secondary" type="button" onclick="clearSearch()" id="clear-search-btn" style="display:none">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+    </div>
+    <div class="col-md-6 text-end" id="search-result-count"></div>
+</div>
+
 <!-- 统计信息 -->
 <div class="row mb-4">
     <div class="col-md-3 mb-3">
@@ -307,6 +321,8 @@
         let url = `/api/news?page=${currentPage}&per_page=${currentPerPage}`;
         if (filterSite) url += `&site=${encodeURIComponent(filterSite)}`;
         if (filterPushed !== '') url += `&pushed=${filterPushed}`;
+        const q = document.getElementById('search-input')?.value?.trim();
+        if (q) url += `&q=${encodeURIComponent(q)}`;
 
         fetch(url)
             .then(response => response.json())
@@ -375,6 +391,22 @@
         loadPage(currentPage);
     }
 
+    let searchTimer = null;
+    function onSearch() {
+        const input = document.getElementById('search-input');
+        const btn = document.getElementById('clear-search-btn');
+        btn.style.display = input.value.trim() ? 'inline-block' : 'none';
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => loadPage(1), 300);
+    }
+
+    function clearSearch() {
+        document.getElementById('search-input').value = '';
+        document.getElementById('clear-search-btn').style.display = 'none';
+        document.getElementById('search-result-count').innerHTML = '';
+        loadPage(1);
+    }
+
     function exportCSV(range) {
         let url = '/api/export/csv?range=' + (range || '30d');
         if (filterSite) url += '&site=' + encodeURIComponent(filterSite);
@@ -384,6 +416,14 @@
 
     // 显示新闻列表 + 分页控件
     function displayNews(data) {
+        const q = document.getElementById('search-input')?.value?.trim();
+        const countEl = document.getElementById('search-result-count');
+        if (q) {
+            countEl.innerHTML = `<span class="text-muted">搜索 "<strong>${escapeHtml(q)}</strong>" — ${data.total} 条结果</span>`;
+        } else {
+            countEl.innerHTML = '';
+        }
+
         const container = document.getElementById('news-container');
         const news = data.items || [];
 

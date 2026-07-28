@@ -100,6 +100,7 @@ def create_app(monitor):
             per_page = min(request.args.get('per_page', 20, type=int), 100)
             site_filter = request.args.get('site', '')
             pushed_filter = request.args.get('pushed', '')
+            search_query = request.args.get('q', '').strip()
             offset = (page - 1) * per_page
 
             conn = sqlite3.connect(str(get_db_path()))
@@ -107,6 +108,9 @@ def create_app(monitor):
 
             conditions = []
             params = []
+            if search_query:
+                conditions.append('(title LIKE ? OR translated_title LIKE ?)')
+                params.extend([f'%{search_query}%', f'%{search_query}%'])
             llm_threshold = monitor.config.get('llm_filter', {}).get('relevance_threshold', 60)
             if site_filter:
                 conditions.append('site_name = ?')
