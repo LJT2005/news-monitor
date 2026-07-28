@@ -253,6 +253,78 @@
                     </div>
                 </div>
                 <hr>
+                <h6 class="fw-semibold mb-3">
+                    <i class="bi bi-link-45deg text-info me-1"></i>
+                    Webhook 通知
+                </h6>
+                <div class="row g-3">
+                    <!-- Telegram -->
+                    <div class="col-md-6">
+                        <div class="card border">
+                            <div class="card-body py-2 px-3">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="webhook-telegram-enabled">
+                                    <label class="form-check-label fw-semibold" for="webhook-telegram-enabled">
+                                        <i class="bi bi-telegram text-primary me-1"></i>Telegram
+                                    </label>
+                                </div>
+                                <div id="webhook-telegram-fields">
+                                    <input type="text" class="form-control form-control-sm mb-2" id="webhook-telegram-token" placeholder="Bot Token">
+                                    <input type="text" class="form-control form-control-sm" id="webhook-telegram-chatid" placeholder="Chat ID (如 -100123456)">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 飞书 -->
+                    <div class="col-md-6">
+                        <div class="card border">
+                            <div class="card-body py-2 px-3">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="webhook-feishu-enabled">
+                                    <label class="form-check-label fw-semibold" for="webhook-feishu-enabled">
+                                        <i class="bi bi-chat-dots text-success me-1"></i>飞书
+                                    </label>
+                                </div>
+                                <div id="webhook-feishu-fields">
+                                    <input type="url" class="form-control form-control-sm" id="webhook-feishu-url" placeholder="Webhook URL">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 钉钉 -->
+                    <div class="col-md-6">
+                        <div class="card border">
+                            <div class="card-body py-2 px-3">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="webhook-dingtalk-enabled">
+                                    <label class="form-check-label fw-semibold" for="webhook-dingtalk-enabled">
+                                        <i class="bi bi-chat-square-text text-info me-1"></i>钉钉
+                                    </label>
+                                </div>
+                                <div id="webhook-dingtalk-fields">
+                                    <input type="url" class="form-control form-control-sm" id="webhook-dingtalk-url" placeholder="Webhook URL">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Discord -->
+                    <div class="col-md-6">
+                        <div class="card border">
+                            <div class="card-body py-2 px-3">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="webhook-discord-enabled">
+                                    <label class="form-check-label fw-semibold" for="webhook-discord-enabled">
+                                        <i class="bi bi-discord text-primary me-1"></i>Discord
+                                    </label>
+                                </div>
+                                <div id="webhook-discord-fields">
+                                    <input type="url" class="form-control form-control-sm" id="webhook-discord-url" placeholder="Webhook URL">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <hr>
                 <div class="d-flex align-items-center gap-2">
                     <button type="button" class="btn btn-outline-primary btn-sm" onclick="testNotification()">
                         <i class="bi bi-send-check me-1"></i> 测试推送
@@ -972,7 +1044,7 @@
 
     // ========== 通知设置 ==========
 
-    // 初始化通知配置UI
+    // 初始化通知设置UI
     function initNotificationUI() {
         // 确保配置结构存在
         if (!config.notification.bark_urls) {
@@ -993,6 +1065,55 @@
         renderBarkUrls();
         renderServerchanKeys();
         initEmailUI();
+        initWebhookUI();
+    }
+
+    // 初始化 Webhook 设置UI
+    function initWebhookUI() {
+        if (!config.notification.webhooks) {
+            config.notification.webhooks = {
+                telegram: {enabled: false, bot_token: '', chat_id: ''},
+                feishu: {enabled: false, webhook_url: ''},
+                dingtalk: {enabled: false, webhook_url: ''},
+                discord: {enabled: false, webhook_url: ''}
+            };
+        }
+        const wh = config.notification.webhooks;
+        // Telegram
+        document.getElementById('webhook-telegram-enabled').checked = wh.telegram?.enabled || false;
+        document.getElementById('webhook-telegram-token').value = wh.telegram?.bot_token || '';
+        document.getElementById('webhook-telegram-chatid').value = wh.telegram?.chat_id || '';
+        // 飞书
+        document.getElementById('webhook-feishu-enabled').checked = wh.feishu?.enabled || false;
+        document.getElementById('webhook-feishu-url').value = wh.feishu?.webhook_url || '';
+        // 钉钉
+        document.getElementById('webhook-dingtalk-enabled').checked = wh.dingtalk?.enabled || false;
+        document.getElementById('webhook-dingtalk-url').value = wh.dingtalk?.webhook_url || '';
+        // Discord
+        document.getElementById('webhook-discord-enabled').checked = wh.discord?.enabled || false;
+        document.getElementById('webhook-discord-url').value = wh.discord?.webhook_url || '';
+    }
+
+    // 收集 Webhook 表单数据
+    function collectWebhookData() {
+        if (!config.notification.webhooks) config.notification.webhooks = {};
+        config.notification.webhooks.telegram = {
+            enabled: document.getElementById('webhook-telegram-enabled').checked,
+            bot_token: document.getElementById('webhook-telegram-token').value.trim(),
+            chat_id: document.getElementById('webhook-telegram-chatid').value.trim()
+        };
+        config.notification.webhooks.feishu = {
+            enabled: document.getElementById('webhook-feishu-enabled').checked,
+            webhook_url: document.getElementById('webhook-feishu-url').value.trim()
+        };
+        config.notification.webhooks.dingtalk = {
+            enabled: document.getElementById('webhook-dingtalk-enabled').checked,
+            webhook_url: document.getElementById('webhook-dingtalk-url').value.trim()
+        };
+        config.notification.webhooks.discord = {
+            enabled: document.getElementById('webhook-discord-enabled').checked,
+            webhook_url: document.getElementById('webhook-discord-url').value.trim()
+        };
     }
     
     // 渲染Bark URL列表
@@ -1247,6 +1368,9 @@
             const addr = input.value.trim();
             if (addr) config.notification.email.to_addresses.push(addr);
         });
+
+        // 收集 Webhook 配置
+        collectWebhookData();
 
         // 关键词筛选设置
         config.keyword_filters.enabled = document.getElementById('keyword-filters-enabled').checked;
