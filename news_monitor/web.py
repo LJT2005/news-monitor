@@ -362,6 +362,7 @@ def create_app(monitor):
         from flask import Response
 
         site_filter = request.args.get('site', '')
+        date_range = request.args.get('range', '30d')  # all, 30d, 7d
         date_from = request.args.get('from', '')
         date_to = request.args.get('to', '')
         pushed_filter = request.args.get('pushed', '')
@@ -374,9 +375,20 @@ def create_app(monitor):
         if site_filter:
             conditions.append('site_name = ?')
             params.append(site_filter)
+
+        # Date range presets (overridden by explicit from/to)
         if date_from:
             conditions.append('date >= ?')
             params.append(date_from)
+        elif date_range == '7d':
+            cutoff = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+            conditions.append('date >= ?')
+            params.append(cutoff)
+        elif date_range == '30d':
+            cutoff = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+            conditions.append('date >= ?')
+            params.append(cutoff)
+        # range=all → no date filter
         if date_to:
             conditions.append('date <= ?')
             params.append(date_to)
