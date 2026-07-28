@@ -72,6 +72,19 @@
                     <option value="unknown">❓ 未检测</option>
                 </select>
             </div>
+            <div class="col-auto">
+                <select class="form-select form-select-sm" id="filter-group" onchange="renderTable()">
+                    <option value="">全部分组</option>
+                </select>
+            </div>
+            <div class="col-auto ms-auto">
+                <button type="button" class="btn btn-sm btn-outline-success me-1" onclick="batchGroupAction(true)" title="启用当前分组的所有站点">
+                    <i class="bi bi-toggle-on"></i> 启全部
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="batchGroupAction(false)" title="禁用当前分组的所有站点">
+                    <i class="bi bi-toggle-off"></i> 禁全部
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -83,6 +96,7 @@
             <table class="table table-hover mb-0">
                 <thead class="table-light">
                     <tr>
+                        <th>分组</th>
                         <th>站点名称</th>
                         <th class="text-center">状态</th>
                         <th class="text-center">本次条数</th>
@@ -96,7 +110,7 @@
                 </thead>
                 <tbody id="stats-table-body">
                     <tr>
-                        <td colspan="9" class="text-center py-5 text-muted">
+                        <td colspan="10" class="text-center py-5 text-muted">
                             <div class="spinner-border spinner-border-sm me-2"></div>加载中...
                         </td>
                     </tr>
@@ -178,28 +192,41 @@
     }
 
     function renderTable() {
-        const filter = document.getElementById('filter-status').value;
+        const statusFilter = document.getElementById('filter-status').value;
+        const groupFilter = document.getElementById('filter-group').value;
         const statsMap = {};
         allStats.forEach(s => statsMap[s.site_name] = s);
 
         // 以配置列表为主，补充未检测的站点
         const rows = configSites.map(site => {
             const s = statsMap[site.name] || { site_name: site.name };
-            return { ...s, enabled: site.enabled, url: site.url, site_type: site.site_type };
+            return { ...s, enabled: site.enabled, url: site.url, site_type: site.site_type, group: site.group || '' };
         });
 
         // 也加入有统计但不在配置中的站点（可能被删除）
         const configNames = new Set(configSites.map(s => s.name));
         allStats.forEach(s => {
             if (!configNames.has(s.site_name)) {
-                rows.push({ ...s, enabled: false, url: '', site_type: '' });
+                rows.push({ ...s, enabled: false, url: '', site_type: '', group: '' });
             }
         });
 
-        const filtered = filter ? rows.filter(r => getStatus(r) === filter) : rows;
+        // 收集所有分组名用于下拉
+        const groups = new Set();
+        rows.forEach(r => { if (r.group) groups.add(r.group); });
+        const groupSelect = document.getElementById('filter-group');
+        const currentGroupVal = groupSelect.value;
+        groupSelect.innerHTML = '<option value="">全部分组</option>' +
+            [...groups].sort().map(g => `<option value="${escapeHtml(g)}">${escapeHtml(g)}</option>`).join('');
+        groupSelect.value = currentGroupVal;
+
+        // 筛选
+        let filtered = rows;
+        if (statusFilter) filtered = filtered.filter(r => getStatus(r) === statusFilter);
+        if (groupFilter) filtered = filtered.filter(r => (r.group || '') === groupFilter);
 
         if (filtered.length === 0) {
-            document.getElementById('stats-table-body').innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">无匹配站点</td></tr>';
+            document.getElementById('stats-table-body').innerHTML = '<tr><td colspan="10" class="text-center py-4 text-muted">无匹配站点</td></tr>';
             return;
         }
 
@@ -213,6 +240,7 @@
             const successRate = r.total_checks > 0 ? Math.round(r.total_success / r.total_checks * 100) : null;
             const avgTime = r.avg_response_time > 0 ? r.avg_response_time.toFixed(1) + 's' : '-';
             const disabledBadge = r.enabled === false ? ' <span class="badge bg-secondary">禁用</span>' : '';
+            const groupBadge = r.group ? `<span class="badge bg-info me-1">${escapeHtml(r.group)}</span>` : '<span class="text-muted">-</span>';
 
             let rateClass = '';
             if (successRate !== null) {
@@ -220,6 +248,7 @@
             }
 
             html += `<tr>
+                <td>${groupBadge}</td>
                 <td>
                     <strong>${escapeHtml(r.site_name)}</strong>${disabledBadge}
                     <div class="text-muted small text-truncate" style="max-width:300px;">${escapeHtml(r.url || '')}</div>
@@ -236,6 +265,46 @@
         });
 
         document.getElementById('stats-table-body').innerHTML = html;
+    }
+
+    // 批量启用/禁用当前分组
+    function batchGroupAction(enable) {
+        const group = document.getElementById('filter-group').value;
+        if (!group) {
+            showAlert('请先选择一个分组', 'warning');
+            return;
+        }
+        const action = enable ? '启用' : '禁用';
+        if (!confirm(`确定要${action}「${group}」分组的所有站点吗？`)) return;
+
+        fetch('/api/config')
+            .then(r => r.json())
+            .then(cfg => {
+                const sites = cfg.news_sites || [];
+                let changed = 0;
+                sites.forEach(s => {
+                    if ((s.group || '') === group && s.enabled !== enable) {
+                        s.enabled = enable;
+                        changed++;
+                    }
+                });
+                if (changed === 0) {
+                    showAlert('没有需要修改的站点', 'info');
+                    return;
+                }
+                return fetch('/api/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(cfg)
+                }).then(r => r.json());
+            })
+            .then(data => {
+                if (data && data.success) {
+                    showAlert(`✅ 已${action}「${group}」分组的站点`, 'success');
+                    loadStats();
+                }
+            })
+            .catch(err => showAlert('操作失败: ' + err.message, 'danger'));
     }
 
     function escapeHtml(text) {

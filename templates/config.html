@@ -495,6 +495,9 @@
                     <button type="button" class="btn btn-sm btn-primary" onclick="addNewsSite()">
                         <i class="bi bi-plus-circle"></i> 添加网站
                     </button>
+                    <button type="button" class="btn btn-sm btn-outline-info ms-1" onclick="discoverRSS()" title="输入网址自动发现RSS订阅">
+                        <i class="bi bi-search"></i> 发现RSS
+                    </button>
                 </div>
             </div>
             <div class="card-body">
@@ -665,6 +668,11 @@
                                         </select>
                                         <div class="form-text">HTML网站需要配置选择器，RSS订阅会自动解析</div>
                                     </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">分组</label>
+                                        <input type="text" class="form-control" id="site-group-${index}" value="${escapeHtml(site.group || '')}" placeholder="如: 央行、国际组织、智库">
+                                        <div class="form-text">可选，用于分类筛选和批量管理</div>
+                                    </div>
                                 </div>
                                 <div class="col-md-6" id="html-fields-${index}" style="display: ${(site.site_type || 'html') === 'html' ? 'block' : 'none'}">
                                     <div class="mb-3">
@@ -771,7 +779,8 @@
             title_selector: 'h1, h2, h3',
             date_selector: 'time',
             date_format: '%Y-%m-%d',
-            enabled: true
+            enabled: true,
+            group: ''
         };
 
         config.news_sites.push(newSite);
@@ -780,6 +789,53 @@
         // 自动展开新增的站点
         const newIndex = config.news_sites.length - 1;
         setTimeout(() => toggleSiteCard(newIndex), 100);
+    }
+    
+    // RSS自动发现
+    function discoverRSS() {
+        const url = prompt('请输入要发现RSS的网站URL：', 'https://');
+        if (!url) return;
+        
+        const btn = event.target.closest('button');
+        const origHTML = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 发现中...';
+        
+        fetch('/api/discover_rss', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({url: url})
+        })
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = origHTML;
+            if (data.success && data.feeds && data.feeds.length > 0) {
+                data.feeds.forEach(feed => {
+                    config.news_sites.push({
+                        name: feed.title || new URL(feed.url).hostname,
+                        url: feed.url,
+                        site_type: 'rss',
+                        title_selector: '',
+                        date_selector: '',
+                        date_format: '%Y-%m-%d',
+                        enabled: true,
+                        group: ''
+                    });
+                });
+                renderNewsSites();
+                showAlert('✅ 发现 ' + data.feeds.length + ' 个RSS源，已添加到列表', 'success');
+            } else if (data.success) {
+                showAlert('ℹ️ 未发现RSS源，该网站可能不支持RSS', 'info');
+            } else {
+                showAlert('❌ 发现失败: ' + (data.message || '未知错误'), 'danger');
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = origHTML;
+            showAlert('❌ 请求失败: ' + err.message, 'danger');
+        });
     }
     
     // 删除新闻网站
@@ -1415,6 +1471,8 @@
             if (siteTypeEl) site.site_type = siteTypeEl.value;
             if (titleSelectorEl) site.title_selector = titleSelectorEl.value.trim();
             if (dateSelectorEl) site.date_selector = dateSelectorEl.value.trim();
+            const groupEl = document.getElementById(`site-group-${index}`);
+            if (groupEl) site.group = groupEl.value.trim();
         });
     }
     
