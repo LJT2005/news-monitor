@@ -5,12 +5,18 @@
 ## 功能特性
 
 - **多源监控** — 支持 HTML 网页、RSS 订阅、JSON API 三种抓取方式，内置 70+ 机构源
-- **智能抓取** — 轻量 `requests+BS4` 优先，动态页面自动降级 Selenium；请求缓存 + 5 分钟 TTL 避免重复
+- **智能抓取** — 轻量 `requests+BS4` 优先，动态页面自动降级 Selenium；请求缓存 + 5 分钟 TTL；指数退避重试
 - **关键词筛选** — 多组规则，支持 OR（任意匹配）和 AND（全部匹配）模式，只推送关心的新闻
 - **LLM 筛选** — 接入 DeepSeek 等大模型，自动评估新闻相关性并翻译标题
+- **新闻搜索** — 首页搜索框，模糊搜索中英文标题，300ms 防抖实时筛选
+- **新闻去重** — `difflib` 标题相似度检测（>85%），自动标记跨源重复新闻，前端黄色标签提示
+- **CSV 导出** — 首页「导出CSV」下拉菜单，支持近 7 天 / 近 30 天 / 全部三种范围，默认当前筛选条件
+- **统计面板** — `/stats` 页面，Chart.js 图表展示 7 日趋势、成功率饼图、来源排行、站点健康表格
+- **配置校验** — 保存配置时前后端双重验证，格式错误当场拦截并展示具体原因
+- **日志轮转** — `RotatingFileHandler` 10MB × 5 个备份文件，无需手动清理
 - **自动翻译** — 支持 DeepLX 翻译 API，也可由 LLM 筛选时附带翻译
 - **多端推送** — 支持 Bark（iOS）、Server酱（微信）、Telegram、飞书、钉钉、Discord、邮件通知
-- **容错机制** — CSS 选择器失效时三级降级（通用选择器 → 链接文本筛选 → 标题标签）；网络请求指数退避重试
+- **CSS 降级** — 选择器失效时三级降级（通用选择器 → 链接文本筛选 → 标题标签），不会颗粒无收
 - **健康检查** — `/api/health` 端点，返回数据库状态、失败站点数、待推送量，可接入监控系统
 - **Web 管理** — 现代化 Web 界面，配置、新闻浏览、日志查看一站搞定
 - **跨平台** — Windows / macOS / Linux / WSL 全平台支持
@@ -63,7 +69,29 @@ python app.py
 
 支持同时配置多个渠道，每条新闻推送到所有已启用的渠道。
 
-### 2. 添加新闻源
+### 2. 搜索新闻
+
+首页顶部搜索框，输入关键词即可模糊搜索中英文标题。输入时 300ms 防抖，自动展示匹配结果和总数。点击 ✕ 清除搜索。
+
+### 3. 导出数据
+
+首页「导出CSV」下拉菜单，支持三种时间范围：
+- **近 7 天** — 仅导出最近一周新闻
+- **近 30 天** — 仅导出最近一个月新闻（默认）
+- **全部** — 导出所有历史数据
+
+导出文件为 UTF-8 BOM 编码的 CSV，Excel 直接打开中文不乱码。
+
+### 4. 统计面板
+
+侧栏「统计」页面展示：
+- 概要卡片（新闻总数、抓取成功率、启用站点、故障站点）
+- 近 7 天新闻趋势柱状图
+- 抓取成功/失败饼图
+- 来源新闻量 Top 20 横向柱状图
+- 站点健康详情表格（支持搜索过滤）
+
+### 5. 添加新闻源
 
 每个网站需要配置：
 - **网站名称** — 显示名称
@@ -73,7 +101,7 @@ python app.py
 
 内置 IMF、世界银行、美联储、欧央行、BIS 等 70+ 机构源，可直接启用。
 
-### 3. 关键词筛选
+### 6. 关键词筛选
 
 在「配置」页面开启关键词筛选，添加规则：
 
@@ -82,14 +110,14 @@ python app.py
 
 多条规则之间是 OR 关系，命中任一规则即推送。匹配范围包括原标题和翻译标题，大小写不敏感。
 
-### 4. 翻译设置
+### 7. 翻译设置
 
 两种翻译方式（可同时开启）：
 
 - **独立翻译** — 配置 DeepLX 等翻译 API，抓取时自动翻译标题
 - **LLM 附带翻译** — 开启大模型筛选后，DeepSeek 打分的同时自动翻译（推荐）
 
-### 5. 大模型筛选
+### 8. 大模型筛选
 
 开启后在抓取阶段调用 LLM（默认 DeepSeek）对每条新闻打分。需配置 API Key 和提示词。低于相关性阈值的新闻自动标记为主题无关，不推送。
 
@@ -97,7 +125,7 @@ python app.py
 
 ```
 news-monitor/
-├── app.py                      # 入口（仅 15 行）
+├── app.py                      # 入口 + 日志初始化
 ├── paths.py                    # 跨平台路径管理
 ├── requirements.txt            # Python 依赖
 ├── config.json                 # 运行时配置
@@ -106,17 +134,20 @@ news-monitor/
 │   ├── __init__.py             # NewsMonitor 主类（协调者）
 │   ├── config.py               # 配置加载/保存 + 默认源列表
 │   ├── database.py             # 数据库操作（CRUD + 统计）
-│   ├── scraper.py              # 抓取引擎（轻量 + Selenium + 缓存）
+│   ├── scraper.py              # 抓取引擎（轻量 + Selenium + 缓存 + CSS 降级 + 退避重试）
 │   ├── translator.py           # DeepLX 翻译
 │   ├── llm_filter.py           # LLM 打分 + 关键词匹配
 │   ├── notifier.py             # 多平台推送（Bark/Server酱/Telegram/飞书/钉钉/Discord/邮件）
-│   ├── scheduler.py            # 日志清理
+│   ├── validator.py            # 配置校验（前后端共用）
+│   ├── dedup.py                # 新闻去重（标题相似度检测）
+│   ├── scheduler.py            # 调度器工具
 │   └── web.py                  # Flask 路由 + 应用工厂
 ├── templates/                  # Web 前端模板
 │   ├── base.html
-│   ├── index.html              # 首页（新闻列表 + 分页）
+│   ├── index.html              # 首页（新闻列表 + 搜索 + 分页 + 导出）
 │   ├── config.html             # 配置页
 │   ├── sites.html              # 站点管理
+│   ├── stats.html              # 统计面板（Chart.js 图表）
 │   └── logs.html               # 日志查看
 └── .github/workflows/
     └── build.yml               # GitHub Actions 自动构建
@@ -131,9 +162,11 @@ news-monitor/
 
 | 接口 | 方法 | 说明 |
 |------|------|------|
-| `/api/config` | GET/POST | 获取/更新配置 |
+| `/api/config` | GET/POST | 获取/更新配置（保存时自动校验） |
 | `/api/config/restore-news-sites` | POST | 恢复默认新闻源 |
-| `/api/news?page=1&per_page=20` | GET | 分页获取新闻（支持 site/pushed 筛选） |
+| `/api/news?page=1&per_page=20` | GET | 分页获取新闻（支持 `q`/`site`/`pushed` 筛选） |
+| `/api/export/csv?range=30d` | GET | CSV 导出（`range`=7d/30d/all） |
+| `/api/stats` | GET | 统计聚合（成功率/7日趋势/来源排行） |
 | `/api/check_now` | GET | 立即检查更新 |
 | `/api/push_pending` | POST | 手动推送待发新闻 |
 | `/api/site_stats` | GET | 站点抓取统计 |
