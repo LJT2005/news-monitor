@@ -425,6 +425,11 @@ def _parse_html_titles(title_elements, site_config, soup, date_filter_days=0, tr
         if any(p == title_lower or (len(p) > 6 and p in title_lower) for p in _NAV_PATTERNS):
             continue
 
+        # Skip titles that are too short to be real news (single words, names, etc.)
+        words = title.split()
+        if len(words) < 3 and len(title) < 30:
+            continue
+
         # Extract URL
         url = site_config['url']
         if element.name == 'a' and element.get('href'):
