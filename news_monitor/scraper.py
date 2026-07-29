@@ -414,6 +414,8 @@ def _parse_html_titles(title_elements, site_config, soup, date_filter_days=0, tr
         'tourism websites',
         # ── Journal / magazine issue covers (not real articles) ──
         '月号',  # Japanese magazine issue marker
+        # ── Chinese nav terms ──
+        '高级官员', '联系我们', '年度部长级', '出版物',
     ]
 
     news_items = []
