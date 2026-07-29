@@ -432,6 +432,10 @@ def _parse_html_titles(title_elements, site_config, soup, date_filter_days=0, tr
         'business travel card', 'customs requirements',
         'china market intelligence', 'financial services industry update',
         'us-china trade war tracker',
+        'sub-committee on customs', 'import regulations',
+        'intellectual property rights service', 'apec-oecd',
+        'strong, balanced, secure', 'electrical and electronic equipment mutual',
+        'apec in charts',
     ]
 
     news_items = []
