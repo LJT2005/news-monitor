@@ -426,6 +426,12 @@ def _parse_html_titles(title_elements, site_config, soup, date_filter_days=0, tr
         'innovation and digitalisation', 'telecommunications and information',
         'experts group', 'policy dialogue', 'related links', 'in action',
         'join uscbc', 'economic and financial publications',
+        'competition policy and law', 'economic and technical cooperation',
+        'digital economy steering', 'intellectual property experts',
+        'project funding sources', 'auto-parts supplier portal',
+        'business travel card', 'customs requirements',
+        'china market intelligence', 'financial services industry update',
+        'us-china trade war tracker',
     ]
 
     news_items = []
