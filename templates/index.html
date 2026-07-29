@@ -289,13 +289,16 @@
     function checkNow() {
         showAlert('开始检查新闻更新...', 'info');
 
-        fetch('/api/check_now')
+        fetch('/api/check_now', {method: 'POST'})
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
                     showAlert(data.message, 'success');
-                    // 延迟刷新新闻列表（回到第1页）
-                    setTimeout(() => loadPage(1), 2000);
+                    // 延迟刷新新闻列表和状态（回到第1页）
+                    setTimeout(() => {
+                        updateDashboard();
+                        loadPage(1);
+                    }, 2000);
                 } else {
                     showAlert(data.message, 'danger');
                 }
@@ -672,15 +675,13 @@
 
         document.getElementById('total-news').textContent = totalNews;
 
-        // 今日新增：从当前页的第一页数据中取最新时间作为"最后检查"
-        // 今日新增需要额外请求，用一个小查询
-        fetch('/api/news?page=1&per_page=1')
+        // 最后检查时间从 API status 获取，而非从数据库新闻时间推算
+        fetch('/api/status')
             .then(r => r.json())
             .then(d => {
-                if (d.items && d.items.length > 0) {
-                    const dbDate = new Date(d.items[0].created_at);
-                    dbDate.setHours(dbDate.getHours() + 8);
-                    document.getElementById('last-check').textContent = dbDate.toLocaleString('zh-CN');
+                if (d.last_check_time) {
+                    const t = new Date(d.last_check_time);
+                    document.getElementById('last-check').textContent = t.toLocaleString('zh-CN');
                 }
             })
             .catch(() => {});
