@@ -412,6 +412,8 @@ def _parse_html_titles(title_elements, site_config, soup, date_filter_days=0, tr
         # ── Organizational units (committees, working groups, etc.) ──
         'working group', 'chemical dialogue', 'secretariat staff',
         'tourism websites',
+        # ── Journal / magazine issue covers (not real articles) ──
+        '月号',  # Japanese magazine issue marker
     ]
 
     news_items = []
