@@ -417,7 +417,15 @@ def _parse_html_titles(title_elements, site_config, soup, date_filter_days=0, tr
         # ── Chinese nav terms ──
         '高级官员', '联系我们', '年度部长级', '出版物',
         'senior officials', 'annual ministerial', 'contact apec',
-        'economic and financial publications',
+        # ── APEC category / group / process pages (not publications) ──
+        'structural reform', 'market access group', 'business mobility',
+        'high level policy dialogue', 'apec aspire', 'urbanization',
+        'food security', 'apec in action', 'automotive dialogue',
+        'trade and investment', 'investment experts', 'investment related links',
+        'specialized apec', 'finance ministers', 'agricultural biotechnology',
+        'innovation and digitalisation', 'telecommunications and information',
+        'experts group', 'policy dialogue', 'related links', 'in action',
+        'join uscbc', 'economic and financial publications',
     ]
 
     news_items = []
