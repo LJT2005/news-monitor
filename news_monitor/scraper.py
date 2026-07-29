@@ -647,7 +647,7 @@ def scrape_api_site(site_config, date_filter_days=0, translate_fn=None):
             if url and not url.startswith('http'):
                 url = base_url + url
 
-            date_str = item.get('date', '')
+            date_str = item.get('date', '') or item.get('publishedDate', '') or item.get('date_published', '')
             date_format = site_config.get('date_format', '')
             parsed_date = parse_date_string(date_str, date_format or None)
             date_str = parsed_date.strftime('%Y-%m-%d') if parsed_date else datetime.now().strftime('%Y-%m-%d')

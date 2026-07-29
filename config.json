@@ -49,12 +49,13 @@
     },
     {
       "name": "亚太经合组织",
-      "url": "https://www.apec.org/publications/listings?keyword=&publicationTitle=&publicationNumber=&group=&publicationType=&dateFrom=&dateTo=&page=1",
-      "site_type": "html",
+      "url": "https://www.apec.org/apecapi/publication/getpublications?page=1&pageSize=50",
+      "site_type": "api",
       "title_selector": "div.eyd-card-publication__text > h3",
       "date_selector": "span.eyd-card-publication__date > span.eyd-card-publication__meta__text",
-      "date_format": "%Y-%m-%d",
-      "enabled": false
+      "date_format": "%B %Y",
+      "enabled": true,
+      "base_url": "https://www.apec.org"
     },
     {
       "name": "美联储-feds",
