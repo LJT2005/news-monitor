@@ -662,6 +662,8 @@ def scrape_api_site(site_config, date_filter_days=0, translate_fn=None):
             title = item.get('title', '').strip()
             if not title:
                 continue
+            # Clean APEC "Reports\n\n\n" prefix from concatenated titles
+            title = title.replace('Reports\n\n\n', '').strip()
 
             url = item.get('url', '')
             if url and not url.startswith('http'):
