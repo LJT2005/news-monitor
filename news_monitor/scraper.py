@@ -385,11 +385,33 @@ def _parse_html_titles(title_elements, site_config, soup, date_filter_days=0, tr
     """Parse title elements from HTML into news items. Shared by light and heavy scrapers."""
     # Patterns that are clearly navigation/UI — not news
     _NAV_PATTERNS = [
+        # ── Navigation / framework ──
         'documents & reports', 'documents and reports', 'research & publications',
         'understanding poverty', 'stumble upon', 'share', 'search', 'menu',
         'home', 'about', 'contact', 'login', 'register', 'subscribe',
         'privacy', 'terms of use', 'accessibility', 'copyright',
         'newsletter', 'newsletters', 'breadcrumb', 'skip to main',
+        'skip to footer', 'skip to content', 'skip to navigation',
+        'who we are', 'what we do', 'what we achieved', 'engage with us',
+        'our members', 'how we work', 'host economy', 'policy support unit',
+        'leadership', 'past administration', 'publications',
+        'projects database', 'meeting document database', 'aimp login',
+        'tenders and rfps', 'meetings and events',
+        'declarations and statements', "leaders' declarations",
+        'policies and procedures', 'industry dialogues',
+        'expressed views disclaimer', 'washington, dc',
+        'research and analysis',
+        # ── Generic labels ──
+        'blog post', 'working paper', 'news releases',
+        'member companies', 'board of directors', 'member survey',
+        'all research & analysis', 'washington update',
+        'budget management', 'capacity building',
+        'applying for funds', 'implementing projects',
+        'project overseer toolkit', 'project quality: training',
+        'periodical reports', 'psu governance', 'psu publications',
+        # ── Organizational units (committees, working groups, etc.) ──
+        'working group', 'chemical dialogue', 'secretariat staff',
+        'tourism websites',
     ]
 
     news_items = []
