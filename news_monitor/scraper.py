@@ -426,11 +426,17 @@ def _parse_html_titles(title_elements, site_config, soup, date_filter_days=0, tr
         title_lower = title.lower()
         if any(p == title_lower or (len(p) > 6 and p in title_lower) for p in _NAV_PATTERNS):
             continue
+        # Extra short-pattern substring matches (journal/magazine markers)
+        if any(m in title_lower for m in ['月号', '最新号', '年x月']):
+            continue
 
         # Skip titles that are too short to be real news (single words, names, etc.)
-        words = title.split()
-        if len(words) < 3 and len(title) < 30:
-            continue
+        # CJK text doesn't use spaces — skip word-count check if it contains CJK
+        has_cjk = any('\u4e00' <= c <= '\u9fff' or '\u3040' <= c <= '\u30ff' for c in title)
+        if not has_cjk:
+            words = title.split()
+            if len(words) < 3 and len(title) < 30:
+                continue
 
         # Extract URL
         url = site_config['url']
