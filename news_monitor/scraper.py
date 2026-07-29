@@ -383,10 +383,24 @@ def _fallback_select_titles(soup, site_name):
 
 def _parse_html_titles(title_elements, site_config, soup, date_filter_days=0, translate_fn=None):
     """Parse title elements from HTML into news items. Shared by light and heavy scrapers."""
+    # Patterns that are clearly navigation/UI — not news
+    _NAV_PATTERNS = [
+        'documents & reports', 'documents and reports', 'research & publications',
+        'understanding poverty', 'stumble upon', 'share', 'search', 'menu',
+        'home', 'about', 'contact', 'login', 'register', 'subscribe',
+        'privacy', 'terms of use', 'accessibility', 'copyright',
+        'newsletter', 'newsletters', 'breadcrumb', 'skip to main',
+    ]
+
     news_items = []
     for element in title_elements:
         title = element.get_text().strip()
         if not title or len(title) < 10:
+            continue
+
+        # Skip navigation/UI items
+        title_lower = title.lower()
+        if any(p == title_lower or (len(p) > 6 and p in title_lower) for p in _NAV_PATTERNS):
             continue
 
         # Extract URL
