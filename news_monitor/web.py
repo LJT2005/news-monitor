@@ -228,7 +228,7 @@ def create_app(monitor):
 
     # ── Action APIs ─────────────────────────────────────────────
 
-    @app.route('/api/check_now')
+    @app.route('/api/check_now', methods=['GET', 'POST'])
     def api_check_now():
         try:
             threading.Thread(target=monitor.check_news_updates, daemon=True).start()
