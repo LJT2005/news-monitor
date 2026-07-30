@@ -160,7 +160,6 @@ class NewsMonitor:
             return
 
         self.is_running = True
-        self.last_check_time = datetime.now()
         try:
             logger.info("开始检查新闻更新...")
             all_news = []
@@ -278,6 +277,7 @@ class NewsMonitor:
             logger.error(f"检查新闻更新失败: {str(e)}")
         finally:
             self.is_running = False
+            self.last_check_time = datetime.now()
             self.scrape_progress = {
                 'current_site': '', 'completed': 0,
                 'total': 0, 'status': 'idle'

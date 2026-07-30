@@ -659,8 +659,21 @@ def scrape_api_site(site_config, date_filter_days=0, translate_fn=None):
         resp.raise_for_status()
         data = resp.json()
 
-        items = data.get('items', data) if isinstance(data, dict) else data
-        if not isinstance(items, list):
+        # Support multiple API response shapes:
+        #   1. {"items": [...]}            — standard
+        #   2. [...]                       — bare array
+        #   3. {"documents": {id: {...}}}  — World Bank search API
+        if isinstance(data, dict):
+            if 'documents' in data and isinstance(data['documents'], dict):
+                items = list(data['documents'].values())
+            else:
+                items = data.get('items', data)
+        else:
+            items = data
+
+        if isinstance(items, dict):
+            items = list(items.values())  # last-resort: flatten object to list
+        if not isinstance(items, list) or not items:
             logger.warning(f"API {site_config['name']} 返回格式异常")
             return []
 
@@ -669,7 +682,7 @@ def scrape_api_site(site_config, date_filter_days=0, translate_fn=None):
         base_url = site_config.get('base_url', '')
 
         for item in items:
-            title = item.get('title', '').strip()
+            title = item.get('title', '') or item.get('display_title', '').strip()
             if not title:
                 continue
             # Clean APEC "Reports\n\n\n" prefix from concatenated titles
@@ -679,7 +692,7 @@ def scrape_api_site(site_config, date_filter_days=0, translate_fn=None):
             if url and not url.startswith('http'):
                 url = base_url + url
 
-            date_str = item.get('date', '') or item.get('publishedDate', '') or item.get('date_published', '')
+            date_str = item.get('date', '') or item.get('publishedDate', '') or item.get('date_published', '') or item.get('docdt', '')
             date_format = site_config.get('date_format', '')
             parsed_date = parse_date_string(date_str, date_format or None)
             date_str = parsed_date.strftime('%Y-%m-%d') if parsed_date else datetime.now().strftime('%Y-%m-%d')

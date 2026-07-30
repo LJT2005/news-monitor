@@ -500,6 +500,9 @@ def create_app(monitor):
         next_check_time = None
         if monitor.last_check_time:
             next_check_time = monitor.last_check_time + timedelta(minutes=monitor.config['check_interval'])
+            # 如果计算出的时间已经过去（调度延迟、检查耗时等原因），推到未来
+            if next_check_time < datetime.now():
+                next_check_time = datetime.now() + timedelta(seconds=10)
         else:
             next_check_time = datetime.now() + timedelta(minutes=monitor.config['check_interval'])
 
